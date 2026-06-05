@@ -1,0 +1,1428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>THE HUNGER GAMES — 10TH ANNUAL PANEM SIM</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+:root{
+  --green:#00ff41;--gdim:#00cc33;--gdark:#004d14;--red:#ff3333;--gold:#ffd700;
+  --bg:#000500;--pbg:rgba(0,5,0,0.97);--border:rgba(0,255,65,0.15);
+  --mono:'Share Tech Mono',monospace;--disp:'Orbitron',monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--green);font-family:var(--mono);display:flex;height:100vh;overflow:hidden;}
+#world{position:relative;flex:1;min-width:0;overflow:hidden;}
+#canvas{display:block;width:100%;height:100%;}
+#hud{position:absolute;top:8px;left:8px;pointer-events:none;}
+#hud-title{font-family:var(--disp);font-size:11px;letter-spacing:4px;color:var(--gold);text-shadow:0 0 12px var(--gold);}
+#hud-sub{font-size:8px;letter-spacing:3px;color:var(--gdim);margin-top:1px;}
+#hud-day{position:absolute;top:8px;right:8px;font-family:var(--disp);font-size:10px;letter-spacing:3px;color:var(--gold);pointer-events:none;}
+#cannon-banner{position:absolute;bottom:0;left:0;right:0;pointer-events:none;overflow:hidden;height:60px;}
+.cannon-msg{position:absolute;bottom:4px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.85);border:1px solid var(--red);color:var(--red);font-family:var(--disp);font-size:10px;letter-spacing:3px;padding:5px 16px;white-space:nowrap;animation:fadeUp 3s forwards;}
+@keyframes fadeUp{0%{opacity:1;bottom:4px}70%{opacity:1}100%{opacity:0;bottom:30px}}
+.cannon-msg.snake-alert{border-color:#00ff88;color:#00ff88;font-size:11px;}
+
+#sidebar{width:260px;min-width:260px;background:var(--pbg);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+#sb-scroll{flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:9px;scrollbar-width:thin;scrollbar-color:var(--gdark) transparent;}
+.sim-title{font-family:var(--disp);font-size:11px;font-weight:900;letter-spacing:3px;text-align:center;color:var(--gold);text-shadow:0 0 10px var(--gold);}
+.sim-sub{font-size:7px;letter-spacing:3px;color:var(--gdim);text-align:center;margin-top:2px;}
+.panel{border:1px solid var(--border);background:rgba(0,255,65,0.03);padding:8px;}
+.pt{font-size:7px;letter-spacing:3px;color:var(--gdim);border-bottom:1px solid var(--border);padding-bottom:4px;margin-bottom:6px;}
+.sg{display:grid;grid-template-columns:1fr 1fr;gap:3px 8px;}
+.si{display:flex;flex-direction:column;}.sl{font-size:7px;letter-spacing:2px;color:#005510;}.sv{font-size:13px;color:var(--green);}
+.sv.gold{color:var(--gold);font-family:var(--disp);font-size:16px;text-shadow:0 0 8px var(--gold);}
+.sv.danger{color:#ff4444;font-family:var(--disp);font-size:13px;text-shadow:0 0 8px #ff4444;}
+button{background:transparent;border:1px solid var(--green);color:var(--green);font-family:var(--mono);font-size:9px;padding:4px 8px;cursor:pointer;letter-spacing:1px;text-transform:uppercase;}
+button:hover{background:rgba(0,255,65,0.1);}
+.btn-row{display:flex;gap:5px;flex-wrap:wrap;}
+input[type=range]{width:100%;height:3px;appearance:none;background:var(--gdark);cursor:pointer;}
+input[type=range]::-webkit-slider-thumb{appearance:none;width:10px;height:10px;background:var(--green);border-radius:50%;}
+
+/* Tribute list */
+.tribute-grid{display:grid;grid-template-columns:1fr 1fr;gap:3px;}
+.tribute-card{padding:3px 5px;border:1px solid rgba(0,255,65,0.1);background:rgba(0,0,0,0.3);position:relative;}
+.tribute-card.dead{opacity:0.3;border-color:rgba(255,0,0,0.15);}
+.tribute-card.dead .tc-name{text-decoration:line-through;}
+.tribute-card.venomous{border-color:rgba(0,255,100,0.5);box-shadow:0 0 5px rgba(0,255,100,0.2);}
+.tc-name{font-size:8px;letter-spacing:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tc-hp{height:3px;margin-top:2px;background:#1a0000;border-radius:1px;overflow:hidden;}
+.tc-hp-fill{height:100%;transition:width 0.3s;background:var(--green);}
+.tc-weapon{font-size:6px;color:#666;margin-top:1px;}
+.tc-venom{font-size:6px;color:#00ff88;margin-top:1px;animation:venomPulse 0.8s infinite alternate;}
+@keyframes venomPulse{from{opacity:0.5}to{opacity:1}}
+
+/* Event log */
+#log-panel{flex:0 0 auto;max-height:160px;border-top:1px solid var(--border);padding:8px 10px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--gdark) transparent;}
+.lt{font-size:7px;letter-spacing:3px;color:var(--gdim);margin-bottom:4px;}
+.le{font-size:8px;line-height:1.5;color:#005510;padding:1px 0;}
+.le.kill{color:#cc2222;font-weight:bold;} .le.grab{color:#cc9900;} .le.event{color:var(--gold);} .le.phase{color:var(--green);} .le.snake{color:#00ff88;font-weight:bold;}
+</style>
+</head>
+<body>
+
+<div id="world">
+  <canvas id="canvas"></canvas>
+  <div id="hud">
+    <div id="hud-title">THE HUNGER GAMES</div>
+    <div id="hud-sub">THE 10TH ANNUAL HUNGER GAMES · PANEM ET CIRCENSES</div>
+  </div>
+  <div id="hud-day">DAY 1</div>
+  <div id="cannon-banner"></div>
+</div>
+
+<div id="sidebar">
+  <div id="sb-scroll">
+    <div><div class="sim-title">PANEM</div><div class="sim-sub">10TH ANNUAL · THE EARLY GAMES</div>
+    <div style="font-size:7px;letter-spacing:2px;color:#443300;text-align:center;margin-top:2px;">UNTRAINED · DESPERATE · BRUTAL</div></div>
+
+    <div class="panel">
+      <div class="pt">// ARENA STATUS</div>
+      <div class="sg">
+        <div class="si"><div class="sl">TRIBUTES LEFT</div><div class="sv gold" id="s-alive">24</div></div>
+        <div class="si"><div class="sl">GAME DAY</div><div class="sv gold" id="s-day">1</div></div>
+        <div class="si"><div class="sl">PHASE</div><div class="sv" id="s-phase" style="font-size:10px;">BLOODBATH</div></div>
+        <div class="si"><div class="sl">SUPPLIES LEFT</div><div class="sv" id="s-supplies">—</div></div>
+        <div class="si"><div class="sl">SERPENT MUTTS</div><div class="sv danger" id="s-snakes">—</div></div>
+        <div class="si"><div class="sl">VENOMOUS</div><div class="sv" id="s-venomous" style="color:#00ff88;font-size:13px;">—</div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="pt">// TRIBUTES</div>
+      <div class="tribute-grid" id="tribute-grid"></div>
+    </div>
+
+    <div class="panel">
+      <div class="pt">// CORNUCOPIA</div>
+      <div id="cornucopia-list" style="font-size:8px;color:#665500;line-height:1.8;">Loading…</div>
+    </div>
+
+    <div class="panel">
+      <div class="pt">// CONTROLS</div>
+      <div class="btn-row">
+        <button id="btn-pause">⏸ PAUSE</button>
+        <button id="btn-restart">↺ RESTART</button>
+        <button id="btn-snakes" style="border-color:#00ff88;color:#00ff88;">🐍 RELEASE MUTTS</button>
+      </div>
+      <div style="margin-top:7px;font-size:8px;color:var(--gdim);">SIM SPEED <span id="lbl-spd" style="color:var(--green);">1×</span></div>
+      <input type="range" id="sl-speed" min="1" max="3" value="1" step="1" style="margin-top:3px;">
+    </div>
+  </div>
+
+  <div id="log-panel">
+    <div class="lt">// CAPITOL BROADCAST</div>
+    <div id="event-log"></div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+//  HUNGER GAMES — PANEM SIMULATION  (v2 — Movie-Accurate Serpent Mutts)
+// ============================================================
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const worldDiv = document.getElementById('world');
+
+function resize(){ canvas.width=worldDiv.clientWidth; canvas.height=worldDiv.clientHeight; }
+resize(); window.addEventListener('resize', ()=>{ resize(); generateTerrain(); repositionAll(); });
+
+// ---- CONSTANTS ----
+const CELL           = 22;
+const BLOODBATH_END  = 90;
+const GAME_DAY       = 300;
+const NIGHT_DURATION = 80;
+const HUNGER_DRAIN   = 100/(60*10*GAME_DAY);
+const THIRST_DRAIN   = 100/(60*4*GAME_DAY);
+const FIGHT_DIST     = 18;
+const SENSE_RADIUS   = 75;
+const CAREER_SENSE   = 110;
+
+// ---- DISTRICTS ----
+const DISTRICTS = [
+  {id:1,  name:'Luxury',   career:true,  str:3, agi:3, color:'#ff4488'},
+  {id:2,  name:'Masonry',  career:true,  str:4, agi:2, color:'#ff6600'},
+  {id:3,  name:'Tech',     career:false, str:2, agi:3, color:'#ffff00'},
+  {id:4,  name:'Fishing',  career:true,  str:3, agi:3, color:'#00ffcc'},
+  {id:5,  name:'Power',    career:false, str:2, agi:2, color:'#00ccff'},
+  {id:6,  name:'Trans',    career:false, str:2, agi:3, color:'#4488ff'},
+  {id:7,  name:'Lumber',   career:false, str:3, agi:2, color:'#88ff44'},
+  {id:8,  name:'Textiles', career:false, str:1, agi:2, color:'#ff88cc'},
+  {id:9,  name:'Grain',    career:false, str:2, agi:2, color:'#ffcc44'},
+  {id:10, name:'Livestock',career:false, str:2, agi:2, color:'#44ffaa'},
+  {id:11, name:'Agri',     career:false, str:2, agi:3, color:'#aaffaa'},
+  {id:12, name:'Mining',   career:false, str:3, agi:1, color:'#aaaaaa'},
+];
+
+const TRIBUTE_NAMES = [
+  ['Facet',   'Velveteen'],
+  ['Marcus',  'Sabyn'],
+  ['Circ',    'Teslee'],
+  ['Mizzen',  'Coral'],
+  ['Sol',     'Penna'],
+  ['Otto',    'Lamina'],
+  ['Treech',  'Umber'],
+  ['Bobbin',  'Wovey'],
+  ['Panlo',   'Sheaf'],
+  ['Tanner',  'Brandy'],
+  ['Reaper',  'Dill'],
+  ['Jessup',  'Lucy Gray'],
+];
+
+const DISTRICT_SPECIALIZATION = {
+  1:['Sword','Spear'], 2:['Mace','Club'], 3:['Knife','Blowgun'],
+  4:['Trident'], 5:['Knife'], 6:['Axe'], 7:['Axe','Sickle'],
+  8:['Knife'], 9:['Sickle'], 10:['Club'], 11:['Bow','Sickle'], 12:['Club','Mace'],
+};
+
+const WEAPON_POOL = [
+  {name:'Sword',   attack:5, color:'#e0e0ff', rare:false},
+  {name:'Spear',   attack:4, color:'#cc8844', rare:false},
+  {name:'Bow',     attack:4, color:'#8b4513', rare:false},
+  {name:'Trident', attack:6, color:'#4488ff', rare:true},
+  {name:'Knife',   attack:2, color:'#cccccc', rare:false},
+  {name:'Club',    attack:3, color:'#886644', rare:false},
+  {name:'Axe',     attack:3, color:'#cc4422', rare:false},
+  {name:'Mace',    attack:4, color:'#aaaaaa', rare:false},
+  {name:'Sickle',  attack:3, color:'#88cc44', rare:false},
+  {name:'Blowgun', attack:2, color:'#44aa44', rare:false},
+];
+
+// ---- TERRAIN ----
+let GRID = [], COLS = 0, ROWS = 0;
+const ARENA_RX = 0.44, ARENA_RY = 0.44;
+const TERRAIN = {
+  wall:         { color:'rgba(8,6,3,0.98)',      speed:0    },
+  outer_stands: { color:'rgba(18,14,8,0.95)',    speed:0    },
+  stands:       { color:'rgba(28,22,12,0.88)',   speed:0.15 },
+  tunnel:       { color:'rgba(4,10,4,0.92)',     speed:0.38 },
+  heavy_rubble: { color:'rgba(32,26,14,0.82)',   speed:0.30 },
+  rubble:       { color:'rgba(44,36,18,0.65)',   speed:0.52 },
+  puddle:       { color:'rgba(10,20,35,0.75)',   speed:0.50 },
+  floor:        { color:'rgba(38,32,16,0.38)',   speed:1.0  },
+  cornucopia:   { color:'rgba(90,70,0,0.50)',    speed:1.0  },
+};
+let BOMB_SITES = [];
+
+function generateTerrain(){
+  COLS = Math.ceil(canvas.width / CELL);
+  ROWS = Math.ceil(canvas.height / CELL);
+  const cx = COLS/2, cy = ROWS/2;
+  const ax = COLS * ARENA_RX, ay = ROWS * ARENA_RY;
+  BOMB_SITES = Array.from({length:8}, (_,i)=>{
+    const a = (i/8)*Math.PI*2 + 0.3;
+    return { angle:a, spread: 0.06+noise(i*3,i*7)*0.08 };
+  });
+  GRID = [];
+  for(let r=0;r<ROWS;r++){
+    GRID[r]=[];
+    for(let c=0;c<COLS;c++){
+      const dx=c-cx, dy=r-cy;
+      const od = Math.sqrt((dx/ax)*(dx/ax)+(dy/ay)*(dy/ay));
+      const angle = Math.atan2(dy,dx);
+      const n1 = noise(c*0.18, r*0.18);
+      const n2 = noise(c*0.35+20, r*0.35+20);
+      const nearBomb = BOMB_SITES.some(b=>{
+        let da = Math.abs(b.angle - angle);
+        if(da>Math.PI) da=Math.PI*2-da;
+        return da < b.spread;
+      });
+      let type;
+      if(od > 1.08)       type = 'wall';
+      else if(od > 0.96)  type = 'outer_stands';
+      else if(od > 0.84)  type = nearBomb ? (n1<0.5?'heavy_rubble':'rubble') : (n1<0.15?'tunnel':'stands');
+      else if(od > 0.75)  type = nearBomb ? (n1<0.6?'rubble':'heavy_rubble') : (n1<0.25?'tunnel':n1<0.45?'rubble':'floor');
+      else if(od < 0.08)  type = 'cornucopia';
+      else                type = n1<0.07?'heavy_rubble':n1<0.20?'rubble':n2<0.06?'puddle':'floor';
+      GRID[r][c] = type;
+    }
+  }
+}
+
+function noise(x,y){
+  const X=Math.floor(x),Y=Math.floor(y);const fx=x-X,fy=y-Y;
+  const h=n2(X,Y),h1=n2(X+1,Y),h2=n2(X,Y+1),h3=n2(X+1,Y+1);
+  return lerp(lerp(h,h1,fx),lerp(h2,h3,fx),fy);
+}
+function n2(x,y){ let n=Math.sin(x*127.1+y*311.7)*43758.5453; return n-Math.floor(n); }
+function lerp(a,b,t){ return a+(b-a)*t; }
+function getTerrainAt(px,py){ const c=Math.floor(px/CELL),r=Math.floor(py/CELL); if(r<0||r>=ROWS||c<0||c>=COLS) return TERRAIN.wall; return TERRAIN[GRID[r]?.[c]]||TERRAIN.floor; }
+function isPassable(px,py){ return getTerrainAt(px,py).speed > 0.05; }
+
+function drawTerrain(){
+  ctx.fillStyle='rgba(12,10,5,0.6)'; ctx.fillRect(0,0,canvas.width,canvas.height);
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
+    const t=GRID[r]?.[c]; if(!t) continue;
+    const T=TERRAIN[t]; if(!T) continue;
+    ctx.fillStyle=T.color; ctx.fillRect(c*CELL,r*CELL,CELL,CELL);
+  }
+  const cx=canvas.width/2,cy=canvas.height/2,ax=COLS*ARENA_RX*CELL,ay=ROWS*ARENA_RY*CELL;
+  ctx.strokeStyle='rgba(50,40,20,0.18)';ctx.lineWidth=1;
+  for(let i=1;i<=6;i++){ctx.beginPath();ctx.ellipse(cx,cy,ax*(0.84+i*0.025),ay*(0.84+i*0.025),0,0,Math.PI*2);ctx.stroke();}
+  ctx.strokeStyle='rgba(0,255,65,0.04)';ctx.lineWidth=1;
+  for(let i=0;i<6;i++){
+    const a1=Math.random()*Math.PI*2,r1=Math.random()*ax*0.5,a2=a1+(Math.random()-0.5)*0.8,r2=r1+40+Math.random()*80;
+    ctx.beginPath();ctx.moveTo(cx+Math.cos(a1)*r1,cy+Math.sin(a1)*r1);ctx.lineTo(cx+Math.cos(a2)*r2,cy+Math.sin(a2)*r2);ctx.stroke();
+  }
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
+    if(GRID[r]?.[c]==='puddle'){ctx.fillStyle='rgba(0,80,120,0.3)';ctx.fillRect(c*CELL+2,r*CELL+2,CELL-4,CELL-4);}
+  }
+}
+
+// ---- RESOURCE CLASS ----
+class Resource{
+  constructor(x,y,data){this.x=x;this.y=y;this.data=data;this.taken=false;this.pulse=Math.random()*Math.PI*2;this.size=6;}
+  draw(dt){
+    if(this.taken)return;
+    this.pulse+=dt*2;
+    const col=this.data.weapon?this.data.weapon.color:(this.data.type==='food'?'#44ff44':this.data.type==='water'?'#44aaff':this.data.type==='medicine'?'#ff4444':'#ffaa00');
+    ctx.shadowBlur=6+Math.sin(this.pulse)*2;ctx.shadowColor=col;ctx.fillStyle=col;
+    ctx.save();ctx.translate(this.x,this.y);ctx.rotate(Math.PI/4);ctx.fillRect(-this.size/2,-this.size/2,this.size,this.size);ctx.restore();
+    ctx.shadowBlur=0;ctx.fillStyle='rgba(255,255,255,0.4)';ctx.font='6px Share Tech Mono';ctx.textAlign='center';ctx.textBaseline='top';
+    const label=this.data.weapon?this.data.weapon.name.slice(0,3):(this.data.type||'???').slice(0,3).toUpperCase();
+    ctx.fillText(label,this.x,this.y+this.size);
+  }
+}
+
+// ============================================================
+//  SERPENT MUTT CLASS — Movie-Accurate Dr. Gaul's Creations
+//  Large, iridescent, forked tongue, glowing red slit eyes
+//  Sinusoidal body segments. Pack hunters. NO immunity for anyone.
+// ============================================================
+class Snake {
+  constructor(x, y) {
+    this.x = x; this.y = y;
+    this.angle = Math.random() * Math.PI * 2;
+    // Movie snakes are large — substantial creatures
+    this.headRadius = 8 + Math.random() * 4;
+    this.speed = 1.4 + Math.random() * 0.9;
+
+    // Body trail — positions the head has visited
+    this.trail = [];
+    for (let i = 0; i < 300; i++) this.trail.push({x, y});
+    this.trailCounter = 0;
+
+    // How many body segments to render
+    this.numSegments = 18 + Math.floor(Math.random() * 6);
+    this.segSpacing  = 9;  // pixels between segments
+
+    // AI
+    this.target      = null;
+    this.aiTimer     = Math.random() * 0.4;
+    this.attackCooldown = 0.5 + Math.random() * 0.5;
+
+    // Tongue flicker
+    this.tongueTimer    = Math.random() * 0.8;
+    this.tongueExtended = false;
+
+    // Iridescent color — movie snakes had vivid shifting hues
+    // Pick a base hue: cyan, teal, lime, magenta, golden-yellow
+    const baseHues = [168, 150, 270, 320, 55, 195, 285];
+    this.baseHue    = baseHues[Math.floor(Math.random() * baseHues.length)];
+    this.colorPhase = Math.random() * Math.PI * 2;
+    this.colorSpeed = 0.9 + Math.random() * 0.6;
+
+    // Venom sac visual (bright dot on neck)
+    this.venomPulse = Math.random() * Math.PI * 2;
+
+    // Wander when no target
+    this.wanderAngle = this.angle;
+
+    // Snakes can be killed — tough but not invincible
+    this.hp         = 18 + Math.floor(Math.random() * 8);
+    this.maxHp      = this.hp;
+    this.alive      = true;
+    this.hitFlash   = 0;
+    this.deathTimer = 0;
+  }
+
+  update(dt) {
+    if (!this.alive) { this.deathTimer -= dt; return; }
+    // Once a winner is declared, snakes back off
+    if (winner) { this.target = null; return; }
+    this.hitFlash = Math.max(0, this.hitFlash - dt * 4);
+
+    this.attackCooldown -= dt;
+    this.colorPhase     += dt * this.colorSpeed;
+    this.venomPulse     += dt * 3.5;
+    this.tongueTimer    -= dt;
+    if (this.tongueTimer <= 0) {
+      this.tongueTimer    = 0.12 + Math.random() * 0.55;
+      this.tongueExtended = !this.tongueExtended;
+    }
+
+    this.aiTimer -= dt;
+    if (this.aiTimer <= 0) {
+      this.aiTimer = 0.22 + Math.random() * 0.22;
+      // Target nearest alive tribute — NO EXCEPTIONS, Lucy Gray included
+      const alive = tributes.filter(t => t.alive);
+      if (alive.length > 0) {
+        let nearDist = Infinity, nearT = null;
+        for (const t of alive) {
+          const d = this._dist(t.x, t.y);
+          if (d < nearDist) { nearDist = d; nearT = t; }
+        }
+        this.target = nearT;
+      } else {
+        this.target = null;
+      }
+    }
+
+    // Steer toward target
+    if (this.target && this.target.alive) {
+      const dx = this.target.x - this.x;
+      const dy = this.target.y - this.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      // Smooth angular steering — turn faster when close
+      const targetAngle = Math.atan2(dy, dx);
+      let diff = targetAngle - this.angle;
+      while (diff >  Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      const turnRate = dist < 80 ? 7 : 3.5;
+      this.angle += diff * Math.min(1, dt * turnRate);
+
+      // Attack bite when in range
+      if (dist < this.headRadius + 12 && this.attackCooldown <= 0) {
+        this.attackCooldown = 0.7 + Math.random() * 0.5;
+        const dmg = 0.45 + Math.random() * 0.35;
+        this.target.hp = Math.max(0, this.target.hp - dmg);
+        this.target.hitFlash = 1;
+        // Inject venom — slows & drains over time
+        this.target.venomTimer  = Math.min((this.target.venomTimer || 0) + 6, 15);
+        this.target.venomStacks = (this.target.venomStacks || 0) + 1;
+        if (this.target.hp <= 0) {
+          this.target._die(null, 'snakes');
+        }
+      }
+    } else {
+      // Wander sinuously
+      this.wanderAngle += (Math.random() - 0.5) * dt * 2.5;
+      this.angle = this.wanderAngle;
+    }
+
+    // Move head forward
+    const spd = this.target ? this.speed : this.speed * 0.35;
+    const newX = this.x + Math.cos(this.angle) * spd;
+    const newY = this.y + Math.sin(this.angle) * spd;
+
+    // Soft arena boundary deflection
+    const pad = 20;
+    if (newX < pad)                    this.angle = 0;
+    else if (newX > canvas.width - pad) this.angle = Math.PI;
+    if (newY < pad)                    this.angle = Math.PI * 0.5;
+    else if (newY > canvas.height - pad) this.angle = -Math.PI * 0.5;
+
+    this.x = Math.max(pad, Math.min(canvas.width  - pad, newX));
+    this.y = Math.max(pad, Math.min(canvas.height - pad, newY));
+
+    // Record trail every 2 pixels of movement
+    this.trailCounter++;
+    if (this.trailCounter >= 2) {
+      this.trailCounter = 0;
+      this.trail.unshift({x: this.x, y: this.y});
+      if (this.trail.length > this.numSegments * this.segSpacing + 20) {
+        this.trail.pop();
+      }
+    }
+  }
+
+  _takeDamage(dmg, killer) {
+    this.hp = Math.max(0, this.hp - dmg);
+    this.hitFlash = 1;
+    if (this.hp <= 0) {
+      this.alive = false;
+      this.deathTimer = 1.5;
+      log(`⚔ ${killer.id} SLAYS A SERPENT MUTT!`, 'snake');
+      killer.kills = (killer.kills || 0); // credit but don't count as tribute kill
+    }
+  }
+
+  _dist(x, y) { return Math.sqrt((x - this.x) ** 2 + (y - this.y) ** 2); }
+
+  draw() {
+    if (!this.alive) {
+      if (this.deathTimer <= 0) return;
+      ctx.globalAlpha = this.deathTimer / 1.5;
+      // Draw faded Xs where the snake died
+      ctx.strokeStyle = '#ff0000'; ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(this.x-8,this.y-8); ctx.lineTo(this.x+8,this.y+8);
+      ctx.moveTo(this.x+8,this.y-8); ctx.lineTo(this.x-8,this.y+8);
+      ctx.stroke();
+      ctx.globalAlpha = 1; ctx.lineWidth = 1;
+      return;
+    }
+    // Sample body points from trail
+    const bodyPts = [{x: this.x, y: this.y}];
+    for (let i = 1; i <= this.numSegments; i++) {
+      const idx = Math.min(i * this.segSpacing, this.trail.length - 1);
+      const pt  = this.trail[idx] || this.trail[this.trail.length - 1] || {x: this.x, y: this.y};
+      bodyPts.push(pt);
+    }
+
+    // ── Draw body tail → neck (so head renders on top) ──
+    for (let i = bodyPts.length - 1; i >= 1; i--) {
+      const pt = bodyPts[i];
+      const t  = 1 - (i / bodyPts.length); // 0=tail, 1=neck
+
+      // Taper: body thickest near neck, tapers to tail point
+      const segR = this.headRadius * (0.18 + 0.65 * t);
+
+      // Iridescent hue shift along body + time cycling
+      const segHue  = (this.baseHue + i * 14 + this.colorPhase * 45) % 360;
+      const bright  = 42 + 24 * Math.sin(this.colorPhase * 1.8 + i * 0.45);
+      const sat     = 88 + 12 * Math.sin(this.colorPhase + i * 0.3);
+      const alpha   = 0.72 + t * 0.28;
+
+      ctx.shadowBlur  = 3 + t * 7;
+      ctx.shadowColor = `hsla(${segHue},${sat}%,${bright}%,0.8)`;
+      ctx.fillStyle   = `hsla(${segHue},${sat}%,${bright}%,${alpha})`;
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, segR, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Scale diamond pattern every 3rd segment
+      if (i % 3 === 0 && segR > 4) {
+        const scaleHue = (segHue + 55) % 360;
+        ctx.fillStyle = `hsla(${scaleHue},80%,${bright * 0.55}%,0.35)`;
+        const prev = bodyPts[i - 1] || pt;
+        const segAngle = Math.atan2(pt.y - prev.y, pt.x - prev.x);
+        ctx.save();
+        ctx.translate(pt.x, pt.y);
+        ctx.rotate(segAngle);
+        ctx.beginPath();
+        ctx.ellipse(0, 0, segR * 0.55, segR * 0.32, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    // ── Head ──
+    const headHue   = this.hitFlash > 0 ? 0 : (this.baseHue + this.colorPhase * 45) % 360;
+    const headSat   = this.hitFlash > 0 ? 100 : 100;
+    const headBright = this.hitFlash > 0 ? (50 + this.hitFlash * 40) : (52 + 18 * Math.sin(this.colorPhase * 2.5));
+    ctx.shadowBlur  = 18;
+    ctx.shadowColor = `hsla(${headHue},${headSat}%,${headBright}%,1)`;
+    ctx.fillStyle   = `hsla(${headHue},${headSat}%,${headBright}%,1)`;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.headRadius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Flat snout overlay (slightly darker ellipse toward nose)
+    ctx.fillStyle = `hsla(${headHue},100%,${headBright - 12}%,0.75)`;
+    ctx.beginPath();
+    ctx.ellipse(
+      this.x + Math.cos(this.angle) * this.headRadius * 0.45,
+      this.y + Math.sin(this.angle) * this.headRadius * 0.45,
+      this.headRadius * 0.75, this.headRadius * 0.58, this.angle, 0, Math.PI * 2
+    );
+    ctx.fill();
+
+    // Venom sac glow — bright pulsing dot behind head
+    const vsX = this.x - Math.cos(this.angle) * this.headRadius * 0.7;
+    const vsY = this.y - Math.sin(this.angle) * this.headRadius * 0.7;
+    ctx.shadowBlur  = 8 + 4 * Math.sin(this.venomPulse);
+    ctx.shadowColor = '#00ffcc';
+    ctx.fillStyle   = `rgba(0,255,180,${0.5 + 0.4 * Math.sin(this.venomPulse)})`;
+    ctx.beginPath();
+    ctx.arc(vsX, vsY, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // ── Glowing red slit eyes ──
+    ctx.shadowBlur  = 10;
+    ctx.shadowColor = '#ff2200';
+    const perp = this.angle + Math.PI / 2;
+    for (const side of [-1, 1]) {
+      const ex = this.x + Math.cos(this.angle) * this.headRadius * 0.38 + Math.cos(perp) * this.headRadius * 0.42 * side;
+      const ey = this.y + Math.sin(this.angle) * this.headRadius * 0.38 + Math.sin(perp) * this.headRadius * 0.42 * side;
+      // Eye glow
+      ctx.fillStyle = '#ff5500';
+      ctx.beginPath(); ctx.arc(ex, ey, 2.8, 0, Math.PI * 2); ctx.fill();
+      // Slit pupil (vertical oval rotated to facing direction)
+      ctx.shadowBlur = 0;
+      ctx.fillStyle  = '#000';
+      ctx.beginPath();
+      ctx.ellipse(ex, ey, 0.9, 2.0, this.angle + Math.PI / 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // ── Forked tongue ──
+    if (this.tongueExtended) {
+      const tLen  = this.headRadius * 2.1;
+      const tBase = {
+        x: this.x + Math.cos(this.angle) * this.headRadius * 0.95,
+        y: this.y + Math.sin(this.angle) * this.headRadius * 0.95,
+      };
+      const tMid  = {
+        x: tBase.x + Math.cos(this.angle) * tLen * 0.52,
+        y: tBase.y + Math.sin(this.angle) * tLen * 0.52,
+      };
+      const fork  = 0.42;
+
+      ctx.strokeStyle = '#ff1144';
+      ctx.shadowBlur  = 5;
+      ctx.shadowColor = '#ff1144';
+      ctx.lineWidth   = 1.4;
+      ctx.lineCap     = 'round';
+
+      // Shaft
+      ctx.beginPath(); ctx.moveTo(tBase.x, tBase.y); ctx.lineTo(tMid.x, tMid.y); ctx.stroke();
+      // Left fork
+      ctx.beginPath(); ctx.moveTo(tMid.x, tMid.y);
+      ctx.lineTo(tMid.x + Math.cos(this.angle - fork) * tLen * 0.48, tMid.y + Math.sin(this.angle - fork) * tLen * 0.48);
+      ctx.stroke();
+      // Right fork
+      ctx.beginPath(); ctx.moveTo(tMid.x, tMid.y);
+      ctx.lineTo(tMid.x + Math.cos(this.angle + fork) * tLen * 0.48, tMid.y + Math.sin(this.angle + fork) * tLen * 0.48);
+      ctx.stroke();
+    }
+
+    ctx.shadowBlur = 0; ctx.lineWidth = 1;
+  }
+}
+
+// ============================================================
+//  TRIBUTE CLASS
+// ============================================================
+let tributes=[], resources=[], snakes=[];
+let gameTime=0, gameDay=1, phase='bloodbath', paused=false, simSpeed=1, lastTs=null;
+let logs=[], cannonQueue=[], winner=null;
+let isNight=false;
+let snakeAlertFlash=0;  // brief red flash when snakes are first released
+
+class Tribute{
+  constructor(district, gender, x, y){
+    const D=DISTRICTS[district-1];
+    this.id=`D${district}${gender}`;
+    this.district=district; this.gender=gender;
+    this.name=TRIBUTE_NAMES[district-1][gender==='M'?0:1];
+    this.x=x; this.y=y; this.vx=0; this.vy=0;
+    this.hp=D.career?30:25; this.maxHp=D.career?30:25;
+    this.strength=0.8+(D.career?1.2:0)+(D.str-1)*0.15;
+    this.agility=D.agi;
+    this.isCareer=D.career;
+    this.color=D.color;
+    this.hunger=100; this.thirst=100;
+    this.weapon=null; this.armor=0;
+    this.alive=true; this.dead=false; this.deathTimer=0;
+    this.hitFlash=0;
+    this.speed=0.22+D.agi*0.04;
+    this.size=D.career?8:7;
+    this.hasSpecialWeapon=false; this.specialWeaponBoostApplied=false;
+    this.grabbedFromCornucopia=false;
+    this.bloodbathSpeed=this.speed*1.8;
+    this.state='start'; this.target=null; this.fleeFrom=null; this.resourceTarget=null;
+    this.aiTimer=Math.random()*0.8; this.fightTimer=0;
+    this.stalking=false; this.stalkTimer=0;
+    this.alliance=D.career?'careers':null;
+    this.kills=0; this.killedBy=null;
+    this.currentAction='IDLE';
+    this.attackTarget=null;
+    this.teamLabel=this.alliance||null;
+    this.wanderAngle=Math.random()*Math.PI*2;
+    // Venom system
+    this.venomTimer=0;    // seconds of venom remaining
+    this.venomStacks=0;   // how many times bitten
+    this.venomPulse=0;    // visual pulse phase
+    this.venomFlash=0;    // brief green flash on bite
+  }
+
+  update(dt){
+    if(this.dead){this.deathTimer-=dt;return;}
+    if(!this.alive)return;
+    this.hunger=Math.max(0,this.hunger-HUNGER_DRAIN*dt*60);
+    this.thirst=Math.max(0,this.thirst-THIRST_DRAIN*dt*60);
+    this.fightTimer-=dt; this.aiTimer-=dt;
+    this.hitFlash=Math.max(0,this.hitFlash-dt*3);
+    this.venomFlash=Math.max(0,this.venomFlash-dt*2.5);
+    if(this.hunger<=0||this.thirst<=0){this._die(null,'starvation');return;}
+
+    // ── VENOM: ongoing damage + movement slow ──
+    if(this.venomTimer > 0){
+      this.venomTimer = Math.max(0, this.venomTimer - dt);
+      this.venomPulse += dt * 4;
+      const venomDmg = 0.018 * Math.min(this.venomStacks, 4); // more stacks = more damage per second
+      this.hp = Math.max(0, this.hp - venomDmg * dt * 60);
+      if(this.hp <= 0){ this._die(null, 'venom'); return; }
+    } else {
+      this.venomStacks = 0; // stacks clear when timer expires
+    }
+
+    // ── Snake proximity panic — tributes ALWAYS flee snakes ──
+    const nearSnakes = snakes.filter(s => s.alive && this._distTo(s.x, s.y) < 55);
+    if(nearSnakes.length > 0 && phase !== 'bloodbath'){
+      // Flee toward safety even from the very last snake
+      const closest = nearSnakes.sort((a,b) => this._distTo(a.x,a.y) - this._distTo(b.x,b.y))[0];
+      this.state   = 'fleeing';
+      this.fleeFrom = closest;
+    }
+
+    if(this.aiTimer<=0){
+      this.aiTimer=phase==='bloodbath'?0.2+Math.random()*0.2:0.6+Math.random()*0.5;
+      // Don't re-decide if we're already fleeing from snakes this tick
+      if(this.state !== 'fleeing') this._decide();
+    }
+    if(this.stalking){this.stalkTimer-=dt;if(this.stalkTimer<=0){this.stalking=false;this.state='fighting'; this.currentAction='ATTACK';}}
+    this._move(dt);
+    this._checkResources();
+    this._checkFights();
+  }
+
+  _decide(){
+    const enemies=this._nearbyEnemies();
+    const nearest=enemies[0];
+    const nearbyThreats = enemies.filter(e=>this._distTo(e.x,e.y)<60);
+    const groupedThreat = nearbyThreats.length >= 2;
+    if(phase==='bloodbath'){
+      if(this.grabbedFromCornucopia){
+        if(nearest){
+          if(this.isCareer){this.state='fighting'; this.currentAction='ATTACK';this.target=nearest;}
+          else if(this.weapon&&this.hp>this.maxHp*0.7&&Math.random()>0.55){this.state='fighting'; this.currentAction='ATTACK';this.target=nearest;}
+          else{this.state='retreating'; this.currentAction='RETREAT';this.fleeFrom=nearest;}
+        } else if(this.isCareer){this.state='rushing'; this.currentAction='RUSH';}
+        else{this.state='retreating'; this.currentAction='RETREAT';}
+        return;
+      }
+      // Opening bloodbath behavior:
+      // everyone prioritizes reaching the Cornucopia first.
+      // Fighting only starts after resources are grabbed.
+      if(!this.grabbedFromCornucopia){
+        this.state='rushing'; this.currentAction='RUSH';
+        return;
+      }
+
+      if(nearest&&!this._allied(nearest)){
+        const shouldFight = Math.random() > 0.45;
+        if(shouldFight){
+          this.state='fighting'; this.currentAction='ATTACK';
+          this.target=nearest;
+        }else{
+          this.state='retreating'; this.currentAction='RETREAT';
+          this.fleeFrom=nearest;
+        }
+      }
+      else{this.state='rushing'; this.currentAction='RUSH';}
+      return;
+    }
+    if(this.hunger<22||this.thirst<22){this.state='foraging'; this.currentAction='LOOT';this.target=null;return;}
+
+    // Fight or flight logic
+    if(this.hp < this.maxHp * 0.3){
+      this.state='fleeing'; this.currentAction='FLEE';
+      this.fleeFrom=nearest;
+      return;
+    }
+
+    if(groupedThreat){
+      this.state='fleeing'; this.currentAction='FLEE';
+      this.fleeFrom=nearest;
+      return;
+    }
+
+    if(nearest){
+      const winChance=this._combatProbability(nearest, nearbyThreats.length);
+      const aggressionBias=this.isCareer?0.15:-0.05;
+      const randomDecision=Math.random();
+
+      // Randomized fight/flight with weighted survival instinct
+      if(winChance + aggressionBias > randomDecision){
+        if(!this.isCareer&&!this.stalking&&this._distTo(nearest.x,nearest.y)>FIGHT_DIST*2.5){
+          this.stalking=true;
+          this.stalkTimer=2+Math.random()*3;
+          this.state='hunting'; this.currentAction='HUNT';
+          this.target=nearest;
+        } else {
+          this.stalking=false;
+          this.state='fighting'; this.currentAction='ATTACK';
+          this.target=nearest;
+        }
+      } else {
+        this.stalking=false;
+        this.state='fleeing'; this.currentAction='FLEE';
+        this.fleeFrom=nearest;
+      }
+      return;
+    }
+    this.stalking=false;
+    if(this.hp<this.maxHp*0.5&&!this.isCareer){this.state='hiding'; this.currentAction='HIDE';return;}
+    if(this.isCareer){
+      const r=this._nearestResource();
+      if(r&&!this.weapon){this.state='foraging'; this.currentAction='LOOT';this.resourceTarget=r;}else this.state='hunting'; this.currentAction='HUNT';
+    } else {
+      const r=this._nearestResource();
+      if(!this.weapon&&r&&this._distTo(r.x,r.y)<160&&enemies.length===0){this.state='foraging'; this.currentAction='LOOT';this.resourceTarget=r;}
+      else if(this.weapon&&this.hp>this.maxHp*0.75&&Math.random()>0.85){this.state='hunting'; this.currentAction='HUNT';}
+      else{this.state='hiding'; this.currentAction='HIDE';}
+    }
+  }
+
+  _move(dt){
+    const cx=canvas.width/2, cy=canvas.height/2;
+    let tx=null, ty=null;
+    const terrain=getTerrainAt(this.x,this.y);
+    // Venom slow penalty
+    const venomSlow = this.venomTimer > 0 ? (0.55 + 0.45 * (1 - Math.min(this.venomStacks,4)/4)) : 1;
+    const spd=phase==='bloodbath'
+      ? this.bloodbathSpeed*(this.stalking?0.4:1)
+      : this.speed*terrain.speed*(isNight?0.65:1)*(this.stalking?0.4:1)*venomSlow;
+
+    switch(this.state){
+      case 'rushing':    tx=cx;ty=cy; break;
+      case 'retreating': tx=this.x+(this.x-cx)*2;ty=this.y+(this.y-cy)*2; break;
+      case 'fighting':   if(this.target&&this.target.alive){tx=this.target.x;ty=this.target.y;}else{this.state='hunting'; this.currentAction='HUNT';}break;
+      case 'fleeing':
+        if(this.fleeFrom){
+          const fx=this.fleeFrom.x!==undefined?this.fleeFrom.x:this.fleeFrom.x;
+          const fy=this.fleeFrom.y!==undefined?this.fleeFrom.y:this.fleeFrom.y;
+          tx=this.x+(this.x-fx)*3;ty=this.y+(this.y-fy)*3;
+        }else{this.state='hiding'; this.currentAction='HIDE';}
+        break;
+      case 'hunting':
+        const prey=tributes.find(t=>t!==this&&t.alive&&!this._allied(t)&&this._distTo(t.x,t.y)<(this.isCareer?CAREER_SENSE:SENSE_RADIUS));
+        if(prey){tx=prey.x;ty=prey.y;this.target=prey;}else{this._wander();}break;
+      case 'hiding':
+        if(getTerrainAt(this.x,this.y).speed<0.65){this._wander(0.3);}else{this._seekCover();}break;
+      case 'foraging':
+        if(this.resourceTarget&&!this.resourceTarget.taken){tx=this.resourceTarget.x;ty=this.resourceTarget.y;}
+        else{this.resourceTarget=this._nearestResource();this._wander();}break;
+      default: this._wander();
+    }
+    if(tx!==null){
+      const dx=tx-this.x,dy=ty-this.y,dist=Math.max(1,Math.sqrt(dx*dx+dy*dy));
+      this.vx=this.vx*0.6+(dx/dist)*spd*0.4*3;this.vy=this.vy*0.6+(dy/dist)*spd*0.4*3;
+    }
+    const s=Math.sqrt(this.vx*this.vx+this.vy*this.vy);
+    if(s>spd){this.vx=this.vx/s*spd;this.vy=this.vy/s*spd;}
+    // anti-overlap separation
+    for(const other of tributes){
+      if(other===this || !other.alive) continue;
+      const dx=this.x-other.x;
+      const dy=this.y-other.y;
+      const dist=Math.sqrt(dx*dx+dy*dy);
+      const minDist=(this.size+other.size)+4;
+
+      if(dist>0 && dist<minDist){
+        const push=(minDist-dist)*0.08;
+        this.vx += (dx/dist)*push;
+        this.vy += (dy/dist)*push;
+      }
+    }
+
+    const nx=this.x+this.vx,ny=this.y+this.vy;
+    if(isPassable(nx,ny)){this.x=nx;this.y=ny;}
+    else if(isPassable(nx,this.y)){this.x=nx;this.vx*=0.7;}
+    else if(isPassable(this.x,ny)){this.y=ny;this.vy*=0.7;}
+    else{this.vx*=-0.5;this.vy*=-0.5;this.wanderAngle+=Math.PI*(0.5+Math.random());}
+    const mg=5;
+    if(this.x<mg){this.x=mg;this.vx=Math.abs(this.vx);}
+    if(this.x>canvas.width-mg){this.x=canvas.width-mg;this.vx=-Math.abs(this.vx);}
+    if(this.y<mg){this.y=mg;this.vy=Math.abs(this.vy);}
+    if(this.y>canvas.height-mg){this.y=canvas.height-mg;this.vy=-Math.abs(this.vy);}
+  }
+
+  _wander(steer=1){
+    this.wanderAngle+=(Math.random()-0.5)*0.7;
+    const terrain=getTerrainAt(this.x,this.y),spd=this.speed*terrain.speed*steer;
+    this.vx=this.vx*0.8+Math.cos(this.wanderAngle)*spd*0.2*2;
+    this.vy=this.vy*0.8+Math.sin(this.wanderAngle)*spd*0.2*2;
+  }
+
+  _seekCover(){
+    let best=null,bestDist=999;
+    const cr=Math.floor(this.y/CELL),cc=Math.floor(this.x/CELL);
+    for(let dr=-10;dr<=10;dr++)for(let dc=-10;dc<=10;dc++){
+      const r=cr+dr,c=cc+dc;if(r<0||r>=ROWS||c<0||c>=COLS)continue;
+      const t=GRID[r]?.[c];
+      if(t==='rubble'||t==='heavy_rubble'||t==='tunnel'){const d=Math.sqrt(dr*dr+dc*dc);if(d<bestDist){bestDist=d;best={x:c*CELL+CELL/2,y:r*CELL+CELL/2};}}
+    }
+    if(best){
+      const dx=best.x-this.x,dy=best.y-this.y,dist=Math.max(1,Math.sqrt(dx*dx+dy*dy));
+      const spd=this.speed*0.55;
+      this.vx=this.vx*0.75+(dx/dist)*spd*0.25*3;this.vy=this.vy*0.75+(dy/dist)*spd*0.25*3;
+    }else this._wander(0.5);
+  }
+
+  _checkResources(){
+    for(const r of resources){
+      if(r.taken)continue;
+      if(this._distTo(r.x,r.y)<16)this._pickUp(r);
+    }
+    const terrType=GRID[Math.floor(this.y/CELL)]?.[Math.floor(this.x/CELL)];
+    if(terrType==='puddle')this.thirst=Math.min(100,this.thirst+0.4);
+  }
+
+  _pickUp(res){
+    res.taken=true;
+    const wasBloodbath=phase==='bloodbath';
+    if(res.data.weapon&&(!this.weapon||res.data.weapon.attack>this.weapon.attack)){
+      this.weapon=res.data.weapon;
+      const specWeapons=DISTRICT_SPECIALIZATION[this.district]||[];
+      const isSpec=specWeapons.some(w=>res.data.weapon.name.includes(w));
+      if(isSpec&&!this.specialWeaponBoostApplied){
+        this.hasSpecialWeapon=true;this.specialWeaponBoostApplied=true;
+        this.maxHp+=6;this.hp=Math.min(this.maxHp,this.hp+6);
+        this.armor+=1.5;this.strength*=1.4;
+        log(`★ ${this.id} wields ${res.data.weapon.name} — DISTRICT WEAPON!`,'event');
+        fireCannon(`★ ${this.id} — ${res.data.weapon.name} IS THEIR WEAPON!`);
+      }else{log(`${this.id} grabbed ${res.data.weapon.name}`,'grab');}
+      renderTributeList();
+    }else if(res.data.type==='food'){this.hunger=Math.min(100,this.hunger+40);log(`${this.id} snatched food`,'grab');}
+    else if(res.data.type==='water'){this.thirst=Math.min(100,this.thirst+50);log(`${this.id} grabbed water`,'grab');}
+    else if(res.data.type==='medicine'){this.hp=Math.min(this.maxHp,this.hp+3);this.venomTimer=Math.max(0,this.venomTimer-4);log(`${this.id} used medicine`,'grab');}
+    else if(res.data.type==='armor'){this.armor=2;log(`${this.id} strapped on armor`,'grab');}
+    else if(res.data.type==='backpack'){this.hunger=Math.min(100,this.hunger+20);this.thirst=Math.min(100,this.thirst+20);log(`${this.id} grabbed a backpack`,'grab');}
+    if(wasBloodbath&&!this.grabbedFromCornucopia){
+      this.grabbedFromCornucopia=true;
+      const stayChance=this.isCareer?0.92:(this.weapon?0.35:0.12);
+      if(Math.random()<stayChance){log(`${this.id} holds ground at the Cornucopia!`,'event');}
+      else{this.state='retreating'; this.currentAction='RETREAT';log(`${this.id} flees with their prize`,'grab');}
+    }
+    updateCornucopiaList();
+  }
+
+  _checkFights(){
+    if(this.fightTimer>0)return;
+    const fDist=phase==='bloodbath'?FIGHT_DIST*2.2:FIGHT_DIST;
+    for(const t of tributes){
+      if(!t.alive||t===this||this._allied(t))continue;
+      if(this._distTo(t.x,t.y)<fDist){this._attack(t);return;}
+    }
+    // Armed tributes can strike back at nearby snakes
+    if(this.weapon || this.isCareer){
+      for(const s of snakes){
+        if(!s.alive)continue;
+        if(this._distTo(s.x,s.y)<fDist*1.2){
+          this._attackSnake(s);return;
+        }
+      }
+    }
+  }
+
+  _attackSnake(snake){
+    if(this.fightTimer>0)return;
+    const specBonus=this.hasSpecialWeapon?0.35:0;
+    const atk=(this.strength+(this.weapon?.attack||0))*(1+specBonus);
+    const dmg=Math.max(0.5, atk*(0.15+Math.random()*0.15));
+    snake._takeDamage(dmg, this);
+    this.fightTimer=phase==='bloodbath'?1.0:2.8;
+  }
+
+  _attack(enemy){
+    if(this.fightTimer>0)return;
+    const specBonus=this.hasSpecialWeapon?0.35:0;
+    const atk=(this.strength+(this.weapon?.attack||0))*(1+specBonus);
+    const dmg=Math.max(0.2,atk*(0.12+Math.random()*0.13)-enemy.armor*0.3-(enemy.hasSpecialWeapon?0.4:0));
+    this.attackTarget=enemy;
+    enemy.hp=Math.max(0,enemy.hp-dmg);enemy.hitFlash=1;
+    this.fightTimer=phase==='bloodbath'?0.9+(1/(this.agility||1))*0.2:2.5+(1/(this.agility||1))*0.6;
+    if(enemy.hp<=0){this.kills++;enemy._die(this,'combat');}
+  }
+
+  _die(killer,cause){
+    this.alive=false;this.dead=true;this.deathTimer=3;
+    if(killer){this.killedBy=killer.id;killer.hp=Math.min(killer.maxHp,killer.hp+0.5);}
+    const msg=killer?`💀 ${this.id} KILLED BY ${killer.id}`:
+               cause==='starvation'?`💀 ${this.id} PERISHED FROM STARVATION`:
+               cause==='venom'?    `🐍 ${this.id} DEAD FROM MUTT VENOM`:
+               cause==='snakes'?   `🐍 ${this.id} TORN APART BY SERPENT MUTTS`:
+               `💀 ${this.id} DEAD`;
+    log(msg,cause==='snakes'||cause==='venom'?'snake':'kill');
+    fireCannon(msg, cause==='snakes'||cause==='venom');
+    renderTributeList(); updateStats(); checkWinner();
+  }
+
+  _nearbyEnemies(){
+    const sense=phase==='bloodbath'?240:(this.isCareer?CAREER_SENSE:SENSE_RADIUS);
+    const terrType=GRID[Math.floor(this.y/CELL)]?.[Math.floor(this.x/CELL)];
+    const inCover=terrType==='rubble'||terrType==='heavy_rubble'||terrType==='tunnel';
+    const effectiveSense=(inCover&&phase!=='bloodbath')?sense*0.5:sense;
+    return tributes.filter(c=>c!==this&&c.alive&&!this._allied(c)&&this._distTo(c.x,c.y)<effectiveSense)
+      .sort((a,b)=>this._distTo(a.x,a.y)-this._distTo(b.x,b.y));
+  }
+
+  _nearestResource(){
+    return resources.filter(r=>!r.taken&&this._distTo(r.x,r.y)<(this.isCareer?300:SENSE_RADIUS))
+      .sort((a,b)=>this._distTo(a.x,a.y)-this._distTo(b.x,b.y))[0]||null;
+  }
+
+  _combatProbability(enemy, nearbyEnemyCount=1){
+    const myPower=(this.strength*2)+(this.weapon?.attack||0)+(this.armor*0.6)+(this.hp/8);
+    const enemyPower=(enemy.strength*2)+(enemy.weapon?.attack||0)+(enemy.armor*0.6)+(enemy.hp/8);
+
+    // Fear multiple enemies grouping together
+    const groupPenalty=Math.max(0, nearbyEnemyCount-1) * 0.25;
+
+    // Low HP drastically reduces willingness to fight
+    const hpFactor=this.hp/this.maxHp;
+
+    let chance=(myPower/(myPower+enemyPower))*hpFactor;
+    chance-=groupPenalty;
+
+    // Slight randomness so tributes feel unpredictable
+    chance += (Math.random()-0.5)*0.15;
+
+    return Math.max(0.05, Math.min(0.95, chance));
+  }
+
+  _canBeat(enemy){
+    const myPwr=this.strength+(this.weapon?.attack||0)+(this.armor*0.5);
+    const ePwr=enemy.strength+(enemy.weapon?.attack||0)+(enemy.armor*0.5);
+    return myPwr>=ePwr*0.8||this.hp>enemy.hp+3;
+  }
+
+  _allied(other){return this.alliance&&other.alliance&&this.alliance===other.alliance;}
+  _distTo(x,y){const dx=x-this.x,dy=y-this.y;return Math.sqrt(dx*dx+dy*dy);}
+
+  draw(){
+    const alpha=this.dead?Math.max(0,this.deathTimer/3):1;
+    if(alpha<=0)return;
+    ctx.globalAlpha=alpha;
+    if(this.dead){
+      ctx.strokeStyle='#ff3333';ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.moveTo(this.x-this.size,this.y-this.size);ctx.lineTo(this.x+this.size,this.y+this.size);
+      ctx.moveTo(this.x+this.size,this.y-this.size);ctx.lineTo(this.x-this.size,this.y+this.size);ctx.stroke();
+      ctx.globalAlpha=0;return;
+    }
+
+    // Venom glow — green halo when envenomed
+    let color=this.color;
+    if(this.hitFlash>0){
+      color=`rgba(255,${Math.floor(80*(1-this.hitFlash))},0,1)`;
+    }
+    if(this.venomTimer>0){
+      const venomAlpha=0.5+0.4*Math.sin(this.venomPulse);
+      ctx.shadowBlur=12+8*Math.sin(this.venomPulse);
+      ctx.shadowColor=`rgba(0,255,100,${venomAlpha})`;
+    } else {
+      ctx.shadowBlur=this.isCareer?14:8;
+      ctx.shadowColor=color;
+    }
+
+    if(this.teamLabel){
+      ctx.beginPath();
+      ctx.arc(this.x,this.y,this.size+6,0,Math.PI*2);
+      ctx.strokeStyle='rgba(0,255,120,0.5)';
+      ctx.lineWidth=1;
+      ctx.stroke();
+    }
+
+    ctx.beginPath();ctx.arc(this.x,this.y,this.size,0,Math.PI*2);ctx.fillStyle=color;ctx.fill();ctx.shadowBlur=0;
+
+    // Venom visual: small green droplet orbiting the tribute
+    if(this.venomTimer>0){
+      const vAngle=this.venomPulse;
+      const vx=this.x+Math.cos(vAngle)*(this.size+4);
+      const vy=this.y+Math.sin(vAngle)*(this.size+4);
+      ctx.fillStyle=`rgba(0,255,120,${0.6+0.3*Math.sin(this.venomPulse*2)})`;
+      ctx.shadowBlur=5;ctx.shadowColor='#00ff88';
+      ctx.beginPath();ctx.arc(vx,vy,2,0,Math.PI*2);ctx.fill();
+      ctx.shadowBlur=0;
+    }
+
+    if(this.hasSpecialWeapon){
+      ctx.beginPath();ctx.arc(this.x,this.y,this.size+4,0,Math.PI*2);
+      ctx.strokeStyle='rgba(255,215,0,0.7)';ctx.lineWidth=1.5;ctx.stroke();
+      ctx.fillStyle='rgba(255,215,0,0.8)';ctx.font='7px Share Tech Mono';
+      ctx.textBaseline='alphabetic';ctx.fillText('★',this.x-this.size-8,this.y+3);
+    }
+
+    ctx.fillStyle='rgba(0,0,0,0.85)';ctx.font=`bold ${this.size-1}px Share Tech Mono`;
+    ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(this.district,this.x,this.y);
+
+    if(this.weapon){
+      ctx.fillStyle='rgba(255,215,0,0.9)';ctx.font='7px Share Tech Mono';ctx.textBaseline='alphabetic';
+      ctx.fillText('⚔',this.x+this.size+1,this.y-this.size+2);
+    }
+
+    const bw=22,bh=2,bx=this.x-11,by=this.y-this.size-7;
+    ctx.fillStyle='#1a0000';ctx.fillRect(bx,by,bw,bh);
+    ctx.fillStyle=this.hp>this.maxHp*0.6?'#00ff41':this.hp>this.maxHp*0.3?'#ff8800':'#ff0000';
+    ctx.fillRect(bx,by,bw*(this.hp/this.maxHp),bh);
+
+    // Venom bar (green) below HP bar when envenomed
+    if(this.venomTimer>0){
+      const maxVenom=15;
+      ctx.fillStyle='#003311';ctx.fillRect(bx,by+3,bw,1);
+      ctx.fillStyle=`rgba(0,255,100,${0.7+0.3*Math.sin(this.venomPulse)})`;
+      ctx.fillRect(bx,by+3,bw*(this.venomTimer/maxVenom),1);
+    }
+
+    const hungerCol=this.hunger>30?'#00aa22':'#ff4400';
+    const thirstCol=this.thirst>30?'#0088ff':'#ff4400';
+    ctx.fillStyle=hungerCol;ctx.beginPath();ctx.arc(this.x-5,this.y+this.size+5,2,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle=thirstCol;ctx.beginPath();ctx.arc(this.x+1,this.y+this.size+5,2,0,Math.PI*2);ctx.fill();
+
+    
+    // action label
+    ctx.font='7px Share Tech Mono';
+    ctx.textAlign='center';
+    ctx.textBaseline='bottom';
+
+    let actionColor='#ffffff';
+    if(this.currentAction==='ATTACK') actionColor='#ff4444';
+    else if(this.currentAction==='FLEE') actionColor='#00ccff';
+    else if(this.currentAction==='LOOT') actionColor='#ffd700';
+    else if(this.currentAction==='RUSH') actionColor='#ffaa00';
+    else if(this.currentAction==='HIDE') actionColor='#888888';
+    else if(this.currentAction==='HUNT') actionColor='#ff88ff';
+
+    ctx.fillStyle=actionColor;
+    ctx.fillText(this.currentAction,this.x,this.y-this.size-12);
+
+    // team indicator
+    if(this.teamLabel){
+      ctx.fillStyle='#00ff88';
+      ctx.font='6px Share Tech Mono';
+      ctx.fillText('TEAM',this.x,this.y+this.size+14);
+    }
+
+    // attack line
+    if(this.attackTarget && this.attackTarget.alive && this.currentAction==='ATTACK'){
+      ctx.strokeStyle='rgba(255,60,60,0.7)';
+      ctx.lineWidth=1;
+      ctx.beginPath();
+      ctx.moveTo(this.x,this.y);
+      ctx.lineTo(this.attackTarget.x,this.attackTarget.y);
+      ctx.stroke();
+    }
+
+
+    ctx.globalAlpha=1;ctx.shadowBlur=0;
+  }
+}
+
+// ---- DRAW ARENA ----
+function drawArenaStructure(){
+  const cx=canvas.width/2,cy=canvas.height/2;
+  const ax=COLS*ARENA_RX*CELL,ay=ROWS*ARENA_RY*CELL;
+  ctx.strokeStyle='rgba(80,60,20,0.4)';ctx.lineWidth=4;
+  ctx.beginPath();ctx.ellipse(cx,cy,ax*1.08,ay*1.08,0,0,Math.PI*2);ctx.stroke();
+  ctx.strokeStyle='rgba(90,70,25,0.45)';ctx.lineWidth=2;
+  ctx.beginPath();ctx.ellipse(cx,cy,ax*0.83,ay*0.83,0,0,Math.PI*2);ctx.stroke();
+  BOMB_SITES.forEach(b=>{
+    const r=ax*0.93;const bx=cx+Math.cos(b.angle)*r,by=cy+Math.sin(b.angle)*(r*(ay/ax));
+    ctx.shadowBlur=18;ctx.shadowColor='rgba(120,80,10,0.45)';ctx.fillStyle='rgba(60,40,5,0.15)';
+    ctx.beginPath();ctx.arc(bx,by,CELL*3,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
+  });
+  for(let i=0;i<18;i++){
+    const a=(i/18)*Math.PI*2;const px=cx+Math.cos(a)*ax*0.88,py=cy+Math.sin(a)*ay*0.88;
+    ctx.fillStyle='rgba(55,44,22,0.55)';ctx.fillRect(px-4,py-4,8,8);
+    ctx.strokeStyle='rgba(90,70,30,0.3)';ctx.lineWidth=1;ctx.strokeRect(px-4,py-4,8,8);
+  }
+  ctx.shadowBlur=28;ctx.shadowColor='rgba(220,170,0,0.65)';
+  ctx.strokeStyle='rgba(200,155,0,0.75)';ctx.lineWidth=2.5;
+  ctx.beginPath();ctx.moveTo(cx-CELL*3.2,cy);
+  ctx.bezierCurveTo(cx-CELL*1.5,cy-CELL*2.4,cx+CELL*1.5,cy-CELL*1.6,cx+CELL*3.0,cy-CELL*0.4);
+  ctx.bezierCurveTo(cx+CELL*3.5,cy,cx+CELL*3.0,cy+CELL*0.4,cx+CELL*1.5,cy+CELL*1.6);
+  ctx.bezierCurveTo(cx-CELL*1.5,cy+CELL*2.4,cx-CELL*3.2,cy,cx-CELL*3.2,cy);
+  ctx.stroke();
+  ctx.fillStyle='rgba(140,100,0,0.12)';
+  ctx.beginPath();ctx.moveTo(cx-CELL*3.2,cy);
+  ctx.bezierCurveTo(cx-CELL*1.5,cy-CELL*2.4,cx+CELL*1.5,cy-CELL*1.6,cx+CELL*3.0,cy-CELL*0.4);
+  ctx.bezierCurveTo(cx+CELL*3.5,cy,cx+CELL*3.0,cy+CELL*0.4,cx+CELL*1.5,cy+CELL*1.6);
+  ctx.bezierCurveTo(cx-CELL*1.5,cy+CELL*2.4,cx-CELL*3.2,cy,cx-CELL*3.2,cy);
+  ctx.fill();ctx.shadowBlur=0;
+  ctx.fillStyle='rgba(200,160,0,0.38)';ctx.font='8px Orbitron';
+  ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('CORNUCOPIA',cx,cy+CELL*3.4);
+  for(let i=0;i<24;i++){
+    const a=(i/24)*Math.PI*2-Math.PI/2;const pr=0.64;
+    const px=cx+Math.cos(a)*ax*pr,py=cy+Math.sin(a)*ay*pr;
+    ctx.strokeStyle='rgba(70,55,20,0.45)';ctx.lineWidth=1;ctx.strokeRect(px-7,py-7,14,14);
+    ctx.fillStyle='rgba(40,32,12,0.35)';ctx.fillRect(px-7,py-7,14,14);
+  }
+}
+
+// ---- SNAKE ALERT OVERLAY ----
+function drawSnakeAlert(dt){
+  if(snakeAlertFlash <= 0) return;
+  snakeAlertFlash -= dt * 1.2;
+  const alpha = Math.max(0, snakeAlertFlash) * 0.22;
+  ctx.fillStyle = `rgba(0,255,100,${alpha})`;
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  // Flashing border
+  if(snakeAlertFlash > 0.2){
+    ctx.strokeStyle = `rgba(0,255,100,${Math.min(1,snakeAlertFlash)*0.6})`;
+    ctx.lineWidth = 6;
+    ctx.strokeRect(3,3,canvas.width-6,canvas.height-6);
+  }
+}
+
+// ---- MATRIX RAIN ----
+const RAIN=Array.from({length:45},()=>({x:Math.random()*3000,y:Math.random()*2000,speed:35+Math.random()*75,len:5+Math.floor(Math.random()*10),opacity:0.018+Math.random()*0.028,chars:Array.from({length:20},()=>String.fromCharCode(0x30A0+Math.floor(Math.random()*96)))}));
+function drawRain(dt){ctx.font='12px Share Tech Mono';for(const d of RAIN){d.y+=d.speed*dt;if(d.y>canvas.height+300){d.y=-200;d.x=Math.random()*canvas.width;}for(let i=0;i<d.len;i++){ctx.fillStyle=`rgba(0,255,65,${d.opacity*(1-i/d.len)})`;ctx.fillText(d.chars[i%d.chars.length],d.x,d.y-i*14);}}}
+
+function drawNight(){
+  if(!isNight)return;
+  const grad=ctx.createRadialGradient(canvas.width/2,canvas.height/2,canvas.width*0.2,canvas.width/2,canvas.height/2,canvas.width*0.8);
+  grad.addColorStop(0,'rgba(0,0,0,0)');grad.addColorStop(1,'rgba(0,0,20,0.6)');
+  ctx.fillStyle=grad;ctx.fillRect(0,0,canvas.width,canvas.height);
+}
+
+function drawNightSky(){
+  if(!isNight)return;
+  const dead=tributes.filter(t=>!t.alive&&t.deathTimer<=0);
+  const cx=canvas.width/2,cy=canvas.height/2;
+  dead.forEach((t,i)=>{
+    const angle=(i/Math.max(dead.length,1))*Math.PI*2-Math.PI/2;
+    const r=Math.min(canvas.width,canvas.height)*0.28;
+    const sx=cx+Math.cos(angle)*r,sy=cy+Math.sin(angle)*r;
+    ctx.shadowBlur=10;ctx.shadowColor=t.color;
+    ctx.beginPath();ctx.arc(sx,sy,8,0,Math.PI*2);ctx.fillStyle=t.color+'44';ctx.fill();
+    ctx.strokeStyle=t.color+'88';ctx.lineWidth=1;ctx.stroke();
+    ctx.shadowBlur=0;ctx.fillStyle=t.color;ctx.font='7px Share Tech Mono';
+    ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(t.id,sx,sy);
+  });
+}
+
+// ============================================================
+//  TRIGGER DISASTER — Dr. Gaul's Serpent Mutts
+//  Spawn from arena perimeter like in the movie
+// ============================================================
+function triggerSnakeDisaster(){
+  const cx=canvas.width/2, cy=canvas.height/2;
+  const ax=COLS*ARENA_RX*CELL, ay=ROWS*ARENA_RY*CELL;
+
+  if(snakes.filter(s=>s.alive).length > 0){
+    log('🐍 DR. GAUL COMMANDS ANOTHER WAVE — MORE SERPENT MUTTS!','snake');
+    fireCannon('🐍 SECOND WAVE — SERPENT MUTTS!', true);
+  } else {
+    log('🐍 DR. GAUL RELEASES HER SERPENT MUTTS INTO THE ARENA!','snake');
+    log('🐍 The beasts surge from the walls — glittering, venomous, relentless','snake');
+    fireCannon('🐍 DR. GAUL — SERPENT MUTTS UNLEASHED!', true);
+    snakeAlertFlash = 2.5;  // green flash overlay
+  }
+
+  // Spawn up to 3 mutts total — lethal enough, no lag
+  const MAX_SNAKES = 1;
+  const toSpawn = Math.max(0, MAX_SNAKES - snakes.filter(s=>s.alive).length);
+  for(let i=0; i<toSpawn; i++){
+    const angle = Math.random() * Math.PI * 2;
+    const rFrac = 0.62 + Math.random() * 0.12;
+    const sx = cx + Math.cos(angle) * ax * rFrac;
+    const sy = cy + Math.sin(angle) * ay * rFrac;
+    const s = new Snake(sx, sy);
+    s.angle = Math.atan2(cy - sy, cx - sx) + (Math.random()-0.5) * 0.5;
+    snakes.push(s);
+  }
+}
+
+// ---- GAME EVENTS ----
+function fireCannon(msg, isSnake=false){
+  cannonQueue.push(msg);
+  if(cannonQueue.length>1)cannonQueue.shift();
+  const banner=document.getElementById('cannon-banner');
+  banner.innerHTML='';
+  const el=document.createElement('div');
+  el.className='cannon-msg'+(isSnake?' snake-alert':'');
+  el.textContent=msg;
+  banner.appendChild(el);
+  setTimeout(()=>{banner.innerHTML='';},3500);
+}
+
+function checkPhase(){
+  const alive=tributes.filter(t=>t.alive).length;
+  if(phase==='bloodbath'&&gameTime>=BLOODBATH_END){
+    phase='arena';
+    tributes.filter(t=>t.alive).forEach(t=>{if(t.state==='rushing'||t.state==='retreating')t.state='hunting';});
+    log('━━ BLOODBATH ENDS — ARENA PHASE ━━','phase');
+    document.getElementById('s-phase').textContent='ARENA';
+  }
+  if(alive<=5||alive===tributes.filter(t=>t.alive&&t.isCareer).length){
+    tributes.filter(t=>t.alive).forEach(t=>t.alliance=null);
+    if(alive<=5&&phase!=='endgame'){
+      phase='endgame';
+      log('━━ ENDGAME — ALLIANCES SHATTER ━━','event');
+      document.getElementById('s-phase').textContent='ENDGAME';
+    }
+  }
+  // Auto-release snakes on Day 2 if not manually triggered
+  if(gameTime>0&&Math.floor(gameTime/GAME_DAY)===1&&snakes.filter(s=>s.alive).length===0&&Math.random()<0.01){
+    triggerSnakeDisaster();
+  }
+  if(gameTime>0&&Math.floor(gameTime/GAME_DAY)!==Math.floor((gameTime-0.016)/GAME_DAY)&&Math.random()<0.5){
+    sendSponsorGift();
+  }
+}
+
+function sendSponsorGift(){
+  const alive=tributes.filter(t=>t.alive);if(!alive.length)return;
+  const t=alive[Math.floor(Math.random()*alive.length)];
+  const gifts=['food','water','medicine'];
+  const type=gifts[Math.floor(Math.random()*gifts.length)];
+  resources.push(new Resource(t.x+(Math.random()-0.5)*30,t.y+(Math.random()-0.5)*30,{type}));
+  log(`SPONSOR: Capitol drops ${type} near ${t.id}`,'event');
+}
+
+function checkWinner(){
+  const alive=tributes.filter(t=>t.alive);
+  if(alive.length===1&&!winner){
+    winner=alive[0];
+    log(`🏆 VICTOR: ${winner.id} — ${winner.name} from District ${winner.district}!`,'event');
+    fireCannon(`🏆 VICTOR: ${winner.name} · D${winner.district}`);
+    document.getElementById('s-phase').textContent='VICTOR!';
+    paused=true;document.getElementById('btn-pause').textContent='▶ RESUME';
+  }
+  if(alive.length===0){
+    log('ALL TRIBUTES DEAD — NO VICTOR','kill');
+    paused=true;
+  }
+}
+
+function log(msg,type='info'){
+  logs.unshift({msg,type,t:Math.floor(gameTime)});
+  if(logs.length>60)logs.pop();
+  document.getElementById('event-log').innerHTML=logs.slice(0,20).map(e=>`<div class="le ${e.type}">[${e.t}s] ${e.msg}</div>`).join('');
+}
+
+function updateStats(){
+  const alive=tributes.filter(t=>t.alive).length;
+  document.getElementById('s-alive').textContent=alive;
+  document.getElementById('s-day').textContent=gameDay;
+  document.getElementById('s-supplies').textContent=resources.filter(r=>!r.taken).length;
+  document.getElementById('hud-day').textContent=`DAY ${gameDay}${isNight?' · NIGHT':''}`;
+  // Snake count
+  const sc=snakes.filter(s=>s.alive).length;
+  document.getElementById('s-snakes').textContent=sc>0?sc:'—';
+  // Venomous tributes
+  const vc=tributes.filter(t=>t.alive&&t.venomTimer>0).length;
+  document.getElementById('s-venomous').textContent=vc>0?vc:'—';
+}
+
+function renderTributeList(){
+  const grid=document.getElementById('tribute-grid');
+  grid.innerHTML=tributes.map(t=>{
+    const pct=t.alive?Math.max(0,t.hp/t.maxHp*100):0;
+    const hpCol=t.hp>t.maxHp*0.6?'#00ff41':t.hp>t.maxHp*0.3?'#ff8800':'#ff0000';
+    const dead=!t.alive?'dead':'';
+    const venomous=t.alive&&t.venomTimer>0?'venomous':'';
+    const venomBar=t.alive&&t.venomTimer>0?`<div class="tc-venom">🐍 VENOMOUS ×${t.venomStacks||1}</div>`:'';
+    return `<div class="tribute-card ${dead} ${venomous}" style="border-color:${t.color}33;">
+      <div class="tc-name" style="color:${t.color}">${t.id} ${t.name}</div>
+      <div class="tc-hp"><div class="tc-hp-fill" style="width:${pct}%;background:${hpCol};"></div></div>
+      <div class="tc-weapon">${t.hasSpecialWeapon?'★':''}${t.weapon?'⚔'+t.weapon.name.slice(0,6):t.alive?'unarmed':'✝'}</div>
+      ${venomBar}
+    </div>`;
+  }).join('');
+}
+
+function updateCornucopiaList(){
+  const remaining=resources.filter(r=>!r.taken);
+  const weapons=remaining.filter(r=>r.data.weapon).map(r=>r.data.weapon.name);
+  const supplies=remaining.filter(r=>!r.data.weapon).map(r=>r.data.type);
+  document.getElementById('cornucopia-list').innerHTML=
+    `<span style="color:#886600">Weapons: </span>${weapons.length?weapons.join(', '):'—'}<br>`+
+    `<span style="color:#664400">Supplies: </span>${supplies.length?supplies.join(', '):'—'}`;
+}
+
+// ---- MAIN LOOP ----
+let uiTimer=0;
+function loop(ts){
+  requestAnimationFrame(loop);
+  if(!lastTs)lastTs=ts;
+  const rawDt=Math.min((ts-lastTs)/1000,0.1);lastTs=ts;
+  const dt=paused?0:rawDt*simSpeed;
+  gameTime+=dt;
+
+  const dayProgress=(gameTime%GAME_DAY)/GAME_DAY;
+  isNight=dayProgress>(1-NIGHT_DURATION/GAME_DAY);
+  const newDay=Math.floor(gameTime/GAME_DAY)+1;
+  if(newDay!==gameDay){gameDay=newDay;log(`━━ DAY ${gameDay} BEGINS ━━`,'phase');updateStats();}
+
+  ctx.fillStyle='rgba(0,5,0,0.88)';ctx.fillRect(0,0,canvas.width,canvas.height);
+  drawRain(rawDt);
+  drawTerrain();
+  drawArenaStructure();
+  drawNight();
+
+  if(!paused){
+    checkPhase();
+    for(const t of tributes)t.update(dt);
+    for(const s of snakes)s.update(dt);
+    tributes=tributes.filter(t=>t.alive||(t.dead&&t.deathTimer>0));
+    snakes=snakes.filter(s=>s.alive||(s.deathTimer>0));
+
+    // Remove dead snakes (none — they persist; just update living ones)
+    uiTimer+=rawDt;
+    if(uiTimer>0.5){uiTimer=0;updateStats();}
+  }
+
+  // Draw snake alert flash (above terrain, below entities)
+  drawSnakeAlert(paused?0:rawDt);
+
+  for(const r of resources)r.draw(paused?0:rawDt);
+  for(const s of snakes)s.draw();
+  drawNightSky();
+  for(const t of tributes)if(t.dead)t.draw();
+  for(const t of tributes)if(!t.dead)t.draw();
+}
+
+// ---- CONTROLS ----
+document.getElementById('btn-pause').addEventListener('click',function(){paused=!paused;this.textContent=paused?'▶ RESUME':'⏸ PAUSE';});
+document.getElementById('btn-restart').addEventListener('click',()=>{paused=false;document.getElementById('btn-pause').textContent='⏸ PAUSE';initGame();});
+document.getElementById('btn-snakes').addEventListener('click',()=>triggerSnakeDisaster());
+document.getElementById('sl-speed').addEventListener('input',function(){simSpeed=parseInt(this.value);document.getElementById('lbl-spd').textContent=simSpeed+'×';});
+
+// ---- INIT ----
+function initGame(){
+  tributes=[];resources=[];snakes=[];
+  gameTime=0;gameDay=1;phase='bloodbath';
+  logs=[];cannonQueue=[];winner=null;isNight=false;lastTs=null;
+  snakeAlertFlash=0;
+
+  generateTerrain();
+  const cx=canvas.width/2,cy=canvas.height/2;
+  const ax=COLS*ARENA_RX*CELL,ay=ROWS*ARENA_RY*CELL;
+
+  DISTRICTS.forEach((d,i)=>{
+    ['M','F'].forEach((g,gi)=>{
+      const idx=i*2+gi;
+      const angle=(idx/24)*Math.PI*2-Math.PI/2;const pr=0.64;
+      const x=cx+Math.cos(angle)*ax*pr+(Math.random()-0.5)*8;
+      const y=cy+Math.sin(angle)*ay*pr+(Math.random()-0.5)*8;
+      tributes.push(new Tribute(d.id,g,x,y));
+    });
+  });
+
+  spawnCornucopiaResources(cx,cy);
+  updateStats();renderTributeList();updateCornucopiaList();
+
+  log('THE 10TH HUNGER GAMES BEGIN — YEAR 10 A.L.','event');
+  log('24 tributes. Untrained. Desperate. One victor.','phase');
+  log('Dr. Gaul watches from the Capitol…','phase');
+
+  // Lucy Gray — quick and resourceful, no snake immunity
+  const lucyGray=tributes.find(t=>t.name==='Lucy Gray');
+  if(lucyGray){
+    lucyGray.speed*=1.2;
+    log('★ Lucy Gray Baird of District 12 enters the arena','event');
+    log('  (The snakes have no mercy for songbirds.)','phase');
+  }
+}
+
+function spawnCornucopiaResources(cx,cy){
+  resources=[];
+  const shuffledWeapons=[...WEAPON_POOL].sort(()=>Math.random()-0.5).slice(0,9);
+  shuffledWeapons.forEach(w=>{
+    const a=Math.random()*Math.PI*2,r=CELL*(1.5+Math.random()*2.5);
+    resources.push(new Resource(cx+Math.cos(a)*r,cy+Math.sin(a)*r,{weapon:w}));
+  });
+  [{type:'food',count:7},{type:'water',count:5},{type:'medicine',count:3},{type:'armor',count:2},{type:'backpack',count:3}].forEach(s=>{
+    for(let i=0;i<s.count;i++){
+      const a=Math.random()*Math.PI*2,r=CELL*(1.2+Math.random()*3);
+      resources.push(new Resource(cx+Math.cos(a)*r,cy+Math.sin(a)*r,{type:s.type}));
+    }
+  });
+}
+
+function repositionAll(){
+  if(!tributes.length)return;
+  const cx=canvas.width/2,cy=canvas.height/2,r=Math.min(canvas.width,canvas.height)*0.42;
+  tributes.forEach((t,i)=>{const a=(i/24)*Math.PI*2-Math.PI/2;t.x=cx+Math.cos(a)*r;t.y=cy+Math.sin(a)*r;});
+}
+
+initGame();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
