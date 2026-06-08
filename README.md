@@ -1,0 +1,1 @@
+May the odds be ever in your favor.... Sit back and observe each tribute's tragic death. build your own storyline, lucy gray was never meant to be the victor. no, its not ethical but its not illegal either.
